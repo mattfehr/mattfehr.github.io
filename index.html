@@ -5,6 +5,34 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<link rel="stylesheet" href="assets/css/main.css" />
+
+		<!-- Portfolio Grid Fix -->
+		<style>
+			/* Modern responsive grid that plays nicely with the template */
+			#portfolio .portfolio-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+				gap: 2.5rem;
+				margin-top: 2rem;
+			}
+
+			/* Make the cards look consistent */
+			#portfolio .portfolio-grid .item {
+				text-align: center;
+			}
+
+			/* Normalize image height so rows line up nicely */
+			#portfolio .portfolio-grid .item .image img {
+				width: 100%;
+				height: 220px;
+				object-fit: cover;
+			}
+
+			/* Slightly reduce the gap under the image header if desired */
+			#portfolio .portfolio-grid .item header {
+				margin-top: 0.75rem;
+			}
+		</style>
 	</head>
 	<body class="is-preload">
 
@@ -74,79 +102,81 @@
 
 							<p>This is some of the stuff I have created. Some of them will take you to a live deployment and others to their repository on Github</p>
 
-							<div class="row">
-								<div class="col-4 col-12-mobile">
-									<article class="item">
-										<a href="https://github.com/mattfehr/anime_recommender" class="image fit" target="_blank" rel="noopener noreferrer">
-											<img src="images/anime_recommender.png" alt="" />
-										</a>
-										<header>
-											<h3>Anime Recommender</h3>
-										</header>
-									</article>
-									<article class="item">
-										<a href="https://github.com/mattfehr/CECS-323" class="image fit" target="_blank" rel="noopener noreferrer">
-											<img src="images/pizza_schema.png" alt="" />
-										</a>
-										<header>
-											<h3>Pizza Database</h3>
-										</header>
-									</article>
-								</div>
-								<div class="col-4 col-12-mobile">
-									<article class="item">
-										<a href="https://volleyball-rotations-f1f4d.web.app/auth" class="image fit" target="_blank" rel="noopener noreferrer">
-											<img src="images/volleyball.png" alt="" />
-										</a>
-										<header>
-											<h3>Volleyball Rotation Planning Tool</h3>
-										</header>
-									</article>
-									<article class="item">
-										<a href="https://cipher-site.onrender.com/" class="image fit" target="_blank" rel="noopener noreferrer">
-											<img src="images/sub_cipher.jpg" alt="" />
-										</a>
-										<header>
-											<h3>Subsitution Cipher Decrypter</h3>
-										</header>
-									</article>
-								</div>
-								<div class="col-4 col-12-mobile">
-									<article class="item">
-										<a href="https://nulang.onrender.com" class="image fit" target="_blank" rel="noopener noreferrer">
-											<img src="images/nulang.png" alt="" />
-										</a>
-										<header>
-											<h3>Nulang</h3>
-										</header>
-									</article>
-									<article class="item">
-										<a href="https://github.com/mattfehr/CECS-456/blob/main/FinalProject.pdf" class="image fit" target="_blank" rel="noopener noreferrer">
-											<img src="images/smoke.jpg" alt="" />
-										</a>
-										<header>
-											<h3>Fire Classifier</h3>
-										</header>
-									</article>
-								</div>
-								<div class="col-4 col-12-mobile">
-									<article class="item">
-										<a href="https://resumatchai-pi.vercel.app/" class="image fit" target="_blank" rel="noopener noreferrer">
-											<img src="images/resumatch.png" alt="" />
-										</a>
-										<header>
-											<h3>Nulang</h3>
-										</header>
-									</article>
-									<article class="item">
-										<a href="https://eco-tier-website-ix3l.vercel.app/" class="image fit" target="_blank" rel="noopener noreferrer">
-											<img src="images/betterlogo.png" alt="" />
-										</a>
-										<header>
-											<h3>Fire Classifier</h3>
-										</header>
-									</article>
-								</div>
+							<!-- Updated layout: CSS Grid -->
+							<div class="portfolio-grid">
+
+								<article class="item">
+									<a href="https://github.com/mattfehr/anime_recommender" class="image fit" target="_blank" rel="noopener noreferrer">
+										<img src="images/anime_recommender.png" alt="" />
+									</a>
+									<header>
+										<h3>Anime Recommender</h3>
+									</header>
+								</article>
+
+								<article class="item">
+									<a href="https://volleyball-rotations-f1f4d.web.app/auth" class="image fit" target="_blank" rel="noopener noreferrer">
+										<img src="images/volleyball.png" alt="" />
+									</a>
+									<header>
+										<h3>Volleyball Rotation Planning Tool</h3>
+									</header>
+								</article>
+
+								<article class="item">
+									<a href="https://nulang.onrender.com" class="image fit" target="_blank" rel="noopener noreferrer">
+										<img src="images/nulang.png" alt="" />
+									</a>
+									<header>
+										<h3>Nulang</h3>
+									</header>
+								</article>
+
+								<article class="item">
+									<a href="https://github.com/mattfehr/CECS-323" class="image fit" target="_blank" rel="noopener noreferrer">
+										<img src="images/pizza_schema.png" alt="" />
+									</a>
+									<header>
+										<h3>Pizza Database</h3>
+									</header>
+								</article>
+
+								<article class="item">
+									<a href="https://cipher-site.onrender.com/" class="image fit" target="_blank" rel="noopener noreferrer">
+										<img src="images/sub_cipher.jpg" alt="" />
+									</a>
+									<header>
+										<h3>Subsitution Cipher Decrypter</h3>
+									</header>
+								</article>
+
+								<article class="item">
+									<a href="https://github.com/mattfehr/CECS-456/blob/main/FinalProject.pdf" class="image fit" target="_blank" rel="noopener noreferrer">
+										<img src="images/smoke.jpg" alt="" />
+									</a>
+									<header>
+										<h3>Fire Classifier</h3>
+									</header>
+								</article>
+
+								<article class="item">
+									<a href="https://resumatchai-pi.vercel.app/" class="image fit" target="_blank" rel="noopener noreferrer">
+										<img src="images/resumatch.png" alt="" />
+									</a>
+									<header>
+										<h3>ResuMatch AI</h3>
+									</header>
+								</article>
+
+								<article class="item">
+									<a href="https://eco-tier-website-ix3l.vercel.app/" class="image fit" target="_blank" rel="noopener noreferrer">
+										<img src="images/betterlogo.png" alt="" />
+									</a>
+									<header>
+										<h3>EcoTier Solutions</h3>
+									</header>
+								</article>
+
 							</div>
 
 						</div>
@@ -164,9 +194,9 @@
 
 							<p>
 								I am a fourth year computer science student with a focus on ML/AI attending California State University,
-								Long Beach. I am based in Torrance, California, and I am looking to work in Software Engineering, Machine 
-								Learning, Data Science or any other related fields. I have won 2 hackathons and 1 datathon. In the past, 
-								I have worked as a tutor and am currently participating in a competition to create an innovation for 
+								Long Beach. I am based in Torrance, California, and I am looking to work in Software Engineering, Machine
+								Learning, Data Science or any other related fields. I have won 2 hackathons and 1 datathon. In the past,
+								I have worked as a tutor and am currently participating in a competition to create an innovation for
 								sustainability. Outside of work, I like anime, playing volleyball and going to the beach!
 							</p>
 
