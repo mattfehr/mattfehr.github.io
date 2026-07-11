@@ -3,6 +3,12 @@ contact-form-server/.env
 
 # Ignore dependencies
 contact-form-server/node_modules
+rag/scripts/node_modules
+rag/worker/node_modules
+
+# RAG secrets
+rag/scripts/.env
+rag/worker/.dev.vars
 
 # Optional: Ignore editor configs or OS files
 .DS_Store

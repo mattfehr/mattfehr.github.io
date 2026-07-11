@@ -1,0 +1,21 @@
+{
+  "name": "portfolio-rag-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "index": "tsx upload-to-qdrant.ts",
+    "chunk": "tsx chunk-content.ts",
+    "smoke": "tsx smoke-test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@qdrant/js-client-rest": "^1.13.0",
+    "dotenv": "^16.4.7",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,11 @@
+name = "portfolio-rag-chatbot"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+
+[vars]
+QDRANT_COLLECTION = "portfolio_chunks"
+ALLOWED_ORIGINS = "https://mattfehr-portfolio-prologue.onrender.com,http://127.0.0.1:5500,http://localhost:5500,http://127.0.0.1:8080,http://localhost:8080"
+GEMINI_CHAT_MODEL = "gemini-2.5-flash"
+GEMINI_EMBED_MODEL = "text-embedding-004"
+RATE_LIMIT_MAX = "20"
+RATE_LIMIT_WINDOW_MS = "60000"
