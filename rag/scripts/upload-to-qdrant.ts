@@ -12,30 +12,34 @@ if (!QDRANT_URL || !QDRANT_API_KEY) {
   throw new Error("QDRANT_URL and QDRANT_API_KEY are required");
 }
 
-async function ensureCollection(client: QdrantClient): Promise<void> {
+async function recreateCollection(client: QdrantClient): Promise<void> {
   const collections = await client.getCollections();
   const exists = collections.collections.some((c) => c.name === COLLECTION);
 
-  if (!exists) {
-    console.log(`Creating collection "${COLLECTION}" (${EMBEDDING_DIMENSION} dims)...`);
-    await client.createCollection(COLLECTION, {
-      vectors: {
-        size: EMBEDDING_DIMENSION,
-        distance: "Cosine",
-      },
-    });
-    return;
+  if (exists) {
+    const info = await client.getCollection(COLLECTION);
+    const size = info.config?.params?.vectors;
+    const vectorSize =
+      typeof size === "object" && size !== null && "size" in size ? size.size : undefined;
+
+    if (vectorSize !== EMBEDDING_DIMENSION) {
+      console.warn(
+        `Collection "${COLLECTION}" has ${vectorSize} dims; recreating with ${EMBEDDING_DIMENSION} dims...`,
+      );
+    } else {
+      console.log(`Recreating existing collection "${COLLECTION}" (${EMBEDDING_DIMENSION} dims) to remove stale chunks...`);
+    }
+
+    await client.deleteCollection(COLLECTION);
   }
 
-  const info = await client.getCollection(COLLECTION);
-  const size = info.config?.params?.vectors;
-  const vectorSize = typeof size === "object" && size !== null && "size" in size ? size.size : undefined;
-
-  if (vectorSize !== EMBEDDING_DIMENSION) {
-    throw new Error(
-      `Collection "${COLLECTION}" exists with vector size ${vectorSize}, expected ${EMBEDDING_DIMENSION}`,
-    );
-  }
+  console.log(`Creating collection "${COLLECTION}" (${EMBEDDING_DIMENSION} dims)...`);
+  await client.createCollection(COLLECTION, {
+    vectors: {
+      size: EMBEDDING_DIMENSION,
+      distance: "Cosine",
+    },
+  });
 }
 
 async function main() {
@@ -49,11 +53,11 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`Embedding ${chunks.length} chunks...`);
+  console.log(`Embedding ${chunks.length} chunks locally (no Gemini key needed)...`);
   const embedded = await embedChunks(chunks);
 
   const client = new QdrantClient({ url: QDRANT_URL, apiKey: QDRANT_API_KEY });
-  await ensureCollection(client);
+  await recreateCollection(client);
 
   console.log(`Upserting ${embedded.length} points to "${COLLECTION}"...`);
   await client.upsert(COLLECTION, {

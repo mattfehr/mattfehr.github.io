@@ -1,113 +1,62 @@
-# 🌐 Matthew Fehr — Portfolio Website
+# Matthew Fehr Portfolio Website
 
-A personal portfolio site to showcase my projects, resume, and contact information. Includes a custom-built contact form using a Node.js + Express backend with secure email support.
+Personal portfolio site for projects, resume highlights, and contact information.
 
-## 🔗 Live Demo
+## Live Site
 
-- **Frontend**: [https://mattfehr-portfolio-prologue.onrender.com](https://mattfehr-portfolio-prologue.onrender.com)
-- **Backend API** (Contact form): [https://prologue-portfolio.onrender.com](https://prologue-portfolio.onrender.com)
+- Portfolio: https://mattfehr.github.io/
+- Hosting: GitHub Pages
+- Contact form: Formspree, configured in `index.html`
 
----
+The old Render portfolio/backend links are legacy and are no longer the active deployment path.
 
-## 🧩 Tech Stack
+## Tech Stack
 
-### Frontend
-- HTML5
-- CSS3 (Custom & Template-based)
-- JavaScript
-- Font Awesome Icons
-- [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) for local dev
+- HTML5, CSS3, JavaScript
+- HTML5 UP Prologue template
+- Font Awesome icons
+- Formspree for contact form submissions
+- Optional RAG chatbot widget backed by Cloudflare Worker, Qdrant, Workers AI embeddings, and Gemini chat
 
-### Backend
-- Node.js
-- Express
-- Nodemailer
-- dotenv (for env variables)
-- CORS
+## Project Structure
 
-### Deployment
-- [Render](https://render.com) for both frontend (static site) and backend (web service)
-- Git & GitHub for version control
-
----
-
-## 📬 Contact Form Features
-
-- Fully functional contact form using `fetch()` and `FormData`
-- Prevents page reload with AJAX
-- Displays success/failure messages inline
-- Uses Gmail + App Password for secure email sending
-- Email includes sender's name, email, and message
-- Configurable with `.env` (ignored by Git)
-
----
-
-## 📁 Project Structure
-
-```
+```text
 Prologue/
 ├── assets/
-│   └── css/, js/, images/
-├── contact-form-server/
-│   ├── server.js
-│   ├── .env              
-│   └── package.json
+│   ├── css/
+│   ├── js/
+│   └── images/
+├── contact-form-server/     # legacy Render/Express contact backend
+├── rag/                     # portfolio RAG chatbot backend, widget source, and indexing scripts
 ├── index.html
 └── README.md
 ```
 
----
+## Running Locally
 
-## ⚙️ Running Locally
+Open `index.html` directly in a browser, or use VS Code Live Server.
 
-### Prerequisites
-- Node.js installed
-- Gmail account with 2FA + App Password
+The contact form posts to Formspree. The legacy `contact-form-server/` app is kept for reference, but GitHub Pages does not run Node/Express servers.
 
-### 1. Clone the repo
+## RAG Chatbot
 
-```bash
-git clone https://github.com/your-username/your-repo.git
-cd Prologue
+The chat widget is linked from `index.html`:
+
+```html
+<link rel="stylesheet" href="assets/css/chatbot.css" />
+<script src="assets/js/chatbot.js" defer></script>
 ```
 
-### 2. Start the backend
+The widget is ready, but live answers require a deployed Cloudflare Worker URL in `assets/js/chatbot.js`. See `rag/README.md` for indexing, Qdrant, Worker deploy, and testing steps.
 
-```bash
-cd contact-form-server
-npm install
-node server.js
-```
+## Deployment Notes
 
-> Or use `nodemon server.js` for auto-reloading
+- Static portfolio deploys through GitHub Pages from this repository.
+- The contact form uses Formspree, not the legacy Render backend.
+- The chatbot API deploys separately as a Cloudflare Worker.
 
-### 3. Start the frontend
+## Credits
 
-Use VS Code **Live Server** to open `index.html`, or simply open it in your browser.
-
----
-
-## 🔐 Environment Variables
-
-Create a `.env` file in `contact-form-server/`:
-
-```env
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASS=your_app_password_here
-```
-
----
-
-## 🌍 Deployment Notes
-
-- Backend hosted on Render as a **Web Service** from `contact-form-server/`
-- Frontend hosted on Render as a **Static Site** from root
-- Use `data-api="https://your-backend.onrender.com/contact"` in the form for deployment compatibility
-
----
-
-## ✨ Credits
-
-- Built by **Matthew Fehr**  
-- Template styling from [HTML5 UP](https://html5up.net)
-- Icons from [Font Awesome](https://fontawesome.com)
+- Built by Matthew Fehr
+- Template styling from HTML5 UP
+- Icons from Font Awesome

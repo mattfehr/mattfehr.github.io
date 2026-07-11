@@ -9,6 +9,7 @@ rag/worker/node_modules
 # RAG secrets
 rag/scripts/.env
 rag/worker/.dev.vars
+rag/content/
 
 # Optional: Ignore editor configs or OS files
 .DS_Store

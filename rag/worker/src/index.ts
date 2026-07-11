@@ -1,11 +1,12 @@
 export interface Env {
+  AI: Ai;
   GEMINI_API_KEY: string;
   QDRANT_URL: string;
   QDRANT_API_KEY: string;
   QDRANT_COLLECTION: string;
+  QDRANT_SCORE_THRESHOLD: string;
   ALLOWED_ORIGINS: string;
   GEMINI_CHAT_MODEL: string;
-  GEMINI_EMBED_MODEL: string;
   RATE_LIMIT_MAX: string;
   RATE_LIMIT_WINDOW_MS: string;
 }
@@ -37,6 +38,17 @@ interface Source {
   section: string;
 }
 
+interface RetrievedChunk {
+  payload: ChunkPayload;
+  score: number;
+}
+
+/** Must match local indexing model Xenova/bge-small-en-v1.5 (384 dims). */
+const WORKERS_AI_EMBED_MODEL = "@cf/baai/bge-small-en-v1.5";
+const DEFAULT_GEMINI_CHAT_MODEL = "gemini-3.1-flash-lite";
+const QDRANT_RESULT_LIMIT = 5;
+const SOURCE_LIMIT = 4;
+
 const SYSTEM_PROMPT = `You are Matthew Fehr's portfolio assistant.
 Only answer questions about Matthew, his projects, skills, experience, education, and contact information.
 Use only the provided context.
@@ -58,13 +70,13 @@ function json(data: unknown, status = 200, extraHeaders: Record<string, string> 
 }
 
 function getAllowedOrigins(env: Env): string[] {
-  return env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean);
+  return (env.ALLOWED_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean);
 }
 
 function corsHeaders(origin: string | null, env: Env): Record<string, string> {
   const allowed = getAllowedOrigins(env);
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
   };
@@ -102,41 +114,36 @@ function isRateLimited(ip: string, env: Env): boolean {
 }
 
 async function embedText(text: string, env: Env): Promise<number[]> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_EMBED_MODEL}:embedContent?key=${env.GEMINI_API_KEY}`;
+  const result = (await env.AI.run(WORKERS_AI_EMBED_MODEL, {
+    text: [text],
+  })) as { data?: number[][]; shape?: number[] };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: `models/${env.GEMINI_EMBED_MODEL}`,
-      content: { parts: [{ text }] },
-    }),
-  });
-
-  if (response.status === 429) {
-    throw new RateLimitError("Embedding rate limit reached. Please try again in a minute.");
-  }
-
-  const data = (await response.json()) as {
-    embedding?: { values?: number[] };
-    error?: { message?: string };
-  };
-
-  if (!response.ok) {
-    throw new Error(data.error?.message ?? `Embedding failed (${response.status})`);
-  }
-
-  const values = data.embedding?.values;
+  const values = result.data?.[0];
   if (!values?.length) {
-    throw new Error("Embedding response missing vector values");
+    throw new Error("Workers AI embedding response missing vector values");
   }
 
   return values;
 }
 
-async function searchQdrant(vector: number[], env: Env): Promise<ChunkPayload[]> {
+function getQdrantScoreThreshold(env: Env): number | undefined {
+  const threshold = Number(env.QDRANT_SCORE_THRESHOLD || 0.25);
+  return Number.isFinite(threshold) && threshold > 0 ? threshold : undefined;
+}
+
+async function searchQdrant(vector: number[], env: Env): Promise<RetrievedChunk[]> {
   const collection = env.QDRANT_COLLECTION || "portfolio_chunks";
   const url = `${env.QDRANT_URL.replace(/\/$/, "")}/collections/${collection}/points/search`;
+  const body: Record<string, unknown> = {
+    vector,
+    limit: QDRANT_RESULT_LIMIT,
+    with_payload: true,
+  };
+  const scoreThreshold = getQdrantScoreThreshold(env);
+
+  if (scoreThreshold !== undefined) {
+    body.score_threshold = scoreThreshold;
+  }
 
   const response = await fetch(url, {
     method: "POST",
@@ -144,11 +151,7 @@ async function searchQdrant(vector: number[], env: Env): Promise<ChunkPayload[]>
       "Content-Type": "application/json",
       "api-key": env.QDRANT_API_KEY,
     },
-    body: JSON.stringify({
-      vector,
-      limit: 8,
-      with_payload: true,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -163,17 +166,24 @@ async function searchQdrant(vector: number[], env: Env): Promise<ChunkPayload[]>
   const results = data.result ?? [];
   return results
     .sort((a, b) => {
+      const scoreDiff = (b.score ?? 0) - (a.score ?? 0);
+      if (Math.abs(scoreDiff) > 0.01) return scoreDiff;
+
       const priorityDiff = (b.payload?.priority ?? 0) - (a.payload?.priority ?? 0);
       if (priorityDiff !== 0) return priorityDiff;
-      return (b.score ?? 0) - (a.score ?? 0);
+      return scoreDiff;
     })
-    .map((item) => item.payload ?? {})
-    .filter((payload) => payload.content);
+    .map((item) => ({
+      payload: item.payload ?? {},
+      score: item.score ?? 0,
+    }))
+    .filter((item): item is RetrievedChunk => Boolean(item.payload.content));
 }
 
-function buildContext(chunks: ChunkPayload[]): string {
+function buildContext(chunks: RetrievedChunk[]): string {
   return chunks
-    .map((chunk, index) => {
+    .map((item, index) => {
+      const chunk = item.payload;
       const header = [
         `[Source ${index + 1}]`,
         chunk.title ? `Title: ${chunk.title}` : null,
@@ -188,11 +198,12 @@ function buildContext(chunks: ChunkPayload[]): string {
     .join("\n\n---\n\n");
 }
 
-function extractSources(chunks: ChunkPayload[]): Source[] {
+function extractSources(chunks: RetrievedChunk[]): Source[] {
   const seen = new Set<string>();
   const sources: Source[] = [];
 
-  for (const chunk of chunks) {
+  for (const item of chunks) {
+    const chunk = item.payload;
     const key = `${chunk.title ?? ""}|${chunk.section ?? ""}|${chunk.url ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -202,6 +213,8 @@ function extractSources(chunks: ChunkPayload[]): Source[] {
       url: chunk.url || undefined,
       section: chunk.section ?? "General",
     });
+
+    if (sources.length >= SOURCE_LIMIT) break;
   }
 
   return sources;
@@ -220,7 +233,8 @@ async function generateAnswer(
   context: string,
   env: Env,
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_CHAT_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
+  const model = env.GEMINI_CHAT_MODEL || DEFAULT_GEMINI_CHAT_MODEL;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
 
   const historyContents = history.slice(-6).map((entry) => ({
     role: entry.role === "assistant" ? "model" : "user",
@@ -305,8 +319,18 @@ async function handleChat(request: Request, env: Env, origin: string | null): Pr
   }
 
   const history = Array.isArray(body.history)
-    ? body.history.filter((entry) => entry?.role && entry?.content).slice(-10)
+    ? body.history
+        .filter(
+          (entry): entry is ChatMessage =>
+            (entry?.role === "user" || entry?.role === "assistant") &&
+            typeof entry.content === "string" &&
+            entry.content.trim().length > 0,
+        )
+        .slice(-10)
     : [];
+  const promptHistory = history.filter(
+    (entry, index) => !(index === history.length - 1 && entry.role === "user" && entry.content.trim() === message),
+  );
 
   try {
     const vector = await embedText(message, env);
@@ -315,7 +339,7 @@ async function handleChat(request: Request, env: Env, origin: string | null): Pr
     if (chunks.length === 0) {
       return json(
         {
-          answer: "I do not have indexed portfolio content yet. Please check back after the knowledge base has been populated.",
+          answer: "I do not know based on the indexed portfolio content.",
           sources: [],
         },
         200,
@@ -324,7 +348,7 @@ async function handleChat(request: Request, env: Env, origin: string | null): Pr
     }
 
     const context = buildContext(chunks);
-    const answer = await generateAnswer(message, history, context, env);
+    const answer = await generateAnswer(message, promptHistory, context, env);
     const sources = extractSources(chunks);
 
     return json({ answer, sources }, 200, headers);

@@ -38,7 +38,8 @@ export interface EmbeddedChunk extends ContentChunk {
   vector: number[];
 }
 
-export const EMBEDDING_MODEL = "text-embedding-004";
-export const EMBEDDING_DIMENSION = 768;
+/** Local sentence embedding model (Transformers.js). Must match Worker Workers AI model. */
+export const EMBEDDING_MODEL = "Xenova/bge-small-en-v1.5";
+export const EMBEDDING_DIMENSION = 384;
 export const MIN_CHUNK_TOKENS = 300;
-export const MAX_CHUNK_TOKENS = 700;
+export const MAX_CHUNK_TOKENS = 500;

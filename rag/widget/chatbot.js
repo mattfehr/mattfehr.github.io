@@ -1,8 +1,10 @@
 (function () {
   "use strict";
 
-  // Replace after deploying the Cloudflare Worker
-  const CHAT_API_URL = "https://portfolio-rag-chatbot.YOUR_SUBDOMAIN.workers.dev/chat";
+  // Replace after deploying the Cloudflare Worker, or set window.PORTFOLIO_CHAT_API_URL before this script loads.
+  const CHAT_API_URL =
+    window.PORTFOLIO_CHAT_API_URL || "https://portfolio-rag-chatbot.mattfehr2004.workers.dev/chat";
+  const CHAT_API_CONFIGURED = !CHAT_API_URL.includes("YOUR_SUBDOMAIN");
 
   const STARTER_QUESTIONS = [
     "What AI projects has Matthew built?",
@@ -82,9 +84,7 @@
         chip.target = "_blank";
         chip.rel = "noopener noreferrer";
       }
-      chip.textContent = source.url
-        ? `${source.title} · ${source.section}`
-        : `${source.title} · ${source.section}`;
+      chip.textContent = `${source.title} - ${source.section}`;
       container.appendChild(chip);
     }
   }
@@ -112,6 +112,12 @@
     const trimmed = message.trim();
     if (!trimmed) return;
 
+    if (!CHAT_API_CONFIGURED) {
+      appendMessage("error", "The chat API is not deployed yet.");
+      return;
+    }
+
+    const priorHistory = history.slice(-10);
     appendMessage("user", trimmed);
     history.push({ role: "user", content: trimmed });
     setFormDisabled(true);
@@ -122,7 +128,7 @@
       const response = await fetch(CHAT_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history }),
+        body: JSON.stringify({ message: trimmed, history: priorHistory }),
       });
 
       const data = await response.json();
@@ -151,7 +157,18 @@
   function resetConversation() {
     history.length = 0;
     document.getElementById("portfolio-chatbot-messages").innerHTML = "";
+    document.getElementById("portfolio-chatbot-starters").innerHTML = "";
     renderSources([]);
+    setFormDisabled(!CHAT_API_CONFIGURED);
+
+    if (!CHAT_API_CONFIGURED) {
+      appendMessage(
+        "assistant",
+        "The chat UI is ready, but the Cloudflare Worker URL still needs to be connected before live answers work.",
+      );
+      return;
+    }
+
     appendMessage(
       "assistant",
       "Hi! I can answer questions about Matthew's projects, skills, experience, and contact info.",

@@ -1,96 +1,115 @@
 # Portfolio RAG Chatbot
 
-A retrieval-augmented chatbot for Matthew Fehr's portfolio. The static site stays on GitHub Pages / Render; this folder adds the knowledge base, indexing scripts, Cloudflare Worker API, and frontend widget.
+Retrieval-augmented chatbot for Matthew Fehr's portfolio. The portfolio stays static on GitHub Pages; the chat API runs separately as a Cloudflare Worker.
 
 ## Architecture
 
-```
-Static portfolio (index.html)
+```text
+GitHub Pages portfolio
   -> floating widget (assets/js/chatbot.js)
   -> Cloudflare Worker POST /chat
-  -> Qdrant Cloud (portfolio_chunks)
-  -> Gemini 2.5 Flash + text-embedding-004
+  -> Cloudflare Workers AI query embedding
+  -> Qdrant Cloud collection (portfolio_chunks)
+  -> Gemini chat answer
   -> answer + source links
 ```
 
-## Folder layout
+## Models
 
-- `content/` — Markdown knowledge base (fill templates before indexing)
-- `scripts/` — chunk, embed, and upload to Qdrant
-- `worker/` — Cloudflare Worker API
-- `widget/` — source copy of the chat UI (deployed copy lives in `assets/`)
+- Local indexing embeddings: `Xenova/bge-small-en-v1.5`
+- Worker query embeddings: `@cf/baai/bge-small-en-v1.5`
+- Vector size: 384 dimensions
+- Chat model: `gemini-3.1-flash-lite`
 
-## Step 1: Fill the knowledge base
+## Folder Layout
 
-Edit the Markdown files under `content/`. Each file has YAML frontmatter and section headings. Replace `<!-- TODO: fill -->` placeholders with real content.
+- `content/`: Markdown knowledge base used for indexing
+- `scripts/`: chunk, embed, smoke test, and upload scripts
+- `worker/`: Cloudflare Worker API
+- `widget/`: source copy of the chat UI; deployed copy lives in `assets/`
 
-The indexer skips sections that are empty or placeholder-only. **Do not index until you've filled in meaningful content.**
+## 1. Prepare Content
 
-Project files should explain decisions and outcomes — not paste full source code.
+Edit Markdown files under `content/`. Each file should have YAML frontmatter and useful section headings.
 
-## Step 2: Create Qdrant Cloud cluster
+Project files should explain decisions, outcomes, tech stack, role, challenges, lessons, and links. Do not paste full source code into the knowledge base.
 
-1. Sign up at [Qdrant Cloud](https://cloud.qdrant.io/)
-2. Create a **Free** cluster
-3. Copy the cluster URL and API key
-4. The indexing script creates the `portfolio_chunks` collection automatically (768-dim cosine vectors)
+## 2. Create Qdrant Cloud Cluster
 
-Free tier: 1 GB RAM, 4 GB disk — enough for this portfolio KB.
+1. Create a Qdrant Cloud free cluster.
+2. Copy the cluster URL and API key.
+3. The indexing script creates a fresh `portfolio_chunks` collection with 384-dim cosine vectors.
 
-## Step 3: Get a Gemini API key
+The script recreates the collection on each full index run so deleted or renamed chunks do not linger in search results.
 
-1. Create a key in [Google AI Studio](https://aistudio.google.com/apikey)
-2. Used for embeddings (`text-embedding-004`) and chat (`gemini-2.5-flash`)
-
-Free-tier rate limits apply. The Worker returns friendly 429 messages when limits are hit.
-
-## Step 4: Index content
+## 3. Index Content Locally
 
 ```bash
 cd rag/scripts
 cp .env.example .env
-# Edit .env with GEMINI_API_KEY, QDRANT_URL, QDRANT_API_KEY
+# Edit .env with QDRANT_URL and QDRANT_API_KEY
 
 npm install
-npm run chunk    # preview chunk count
-npm run index    # embed + upsert to Qdrant
+npm run chunk
+npm run smoke
+npm run index
 ```
 
-Re-run `npm run index` whenever you update Markdown content.
+First indexing run downloads the local embedding model weights. Gemini is not used for local indexing.
 
-## Step 5: Deploy the Cloudflare Worker
+## 4. Deploy The Worker
 
 ```bash
 cd rag/worker
 npm install
 
-# Set secrets (not committed)
 npx wrangler secret put GEMINI_API_KEY
 npx wrangler secret put QDRANT_URL
 npx wrangler secret put QDRANT_API_KEY
 
-npm run dev      # local testing
-npm run deploy   # production
+npm run deploy
 ```
 
-After deploy, note your Worker URL (e.g. `https://portfolio-rag-chatbot.<subdomain>.workers.dev`).
+After deployment, copy the Worker URL, for example:
 
-### Worker endpoints
+```text
+https://portfolio-rag-chatbot.mattfehr2004.workers.dev
+```
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| POST | `/chat` | `{ "message": "...", "history": [] }` |
+## Worker Variables
 
-### Test with curl
+Configured in `worker/wrangler.toml`:
+
+| Variable | Purpose |
+| --- | --- |
+| `QDRANT_COLLECTION` | Qdrant collection name, default `portfolio_chunks` |
+| `QDRANT_SCORE_THRESHOLD` | Minimum vector score for retrieved chunks |
+| `ALLOWED_ORIGINS` | Browser origins allowed to call the Worker |
+| `GEMINI_CHAT_MODEL` | Gemini model for final answers |
+| `RATE_LIMIT_MAX` | Requests allowed per IP window |
+| `RATE_LIMIT_WINDOW_MS` | Rate limit window length |
+
+Secrets set with Wrangler:
+
+| Secret | Purpose |
+| --- | --- |
+| `GEMINI_API_KEY` | Google AI Studio API key |
+| `QDRANT_URL` | Qdrant cluster URL |
+| `QDRANT_API_KEY` | Qdrant API key |
+
+## 5. Test The Worker
 
 ```bash
-curl -X POST "https://portfolio-rag-chatbot.<subdomain>.workers.dev/chat" \
+curl -X GET "https://portfolio-rag-chatbot.mattfehr2004.workers.dev/health"
+```
+
+```bash
+curl -X POST "https://portfolio-rag-chatbot.mattfehr2004.workers.dev/chat" \
   -H "Content-Type: application/json" \
   -d '{"message":"What AI projects has Matthew built?","history":[]}'
 ```
 
-Expected response:
+Expected chat response:
 
 ```json
 {
@@ -99,61 +118,31 @@ Expected response:
 }
 ```
 
-## Step 6: Wire the widget to the Worker
+## 6. Wire The Widget
 
-1. Update `CHAT_API_URL` in both:
-   - `assets/js/chatbot.js` (deployed copy)
-   - `rag/widget/chatbot.js` (source copy)
-2. If your portfolio domain changes, add it to `ALLOWED_ORIGINS` in `rag/worker/wrangler.toml` and redeploy.
+Update `CHAT_API_URL` in both files:
 
-The widget is already linked from `index.html`:
+- `assets/js/chatbot.js`
+- `rag/widget/chatbot.js`
 
-```html
-<link rel="stylesheet" href="assets/css/chatbot.css" />
-<script src="assets/js/chatbot.js" defer></script>
+Use the deployed Worker chat endpoint:
+
+```text
+https://portfolio-rag-chatbot.mattfehr2004.workers.dev/chat
 ```
 
-## Widget features
+The Worker CORS config already includes `https://mattfehr.github.io`.
 
-- Floating launcher button
-- Suggested starter questions
-- Typing / loading state
-- Source citation chips
-- Conversation reset
-- Rate-limit and network error messages
-- Mobile-friendly layout
+## Guardrails
 
-## Prompt guardrails
-
-The Worker system prompt restricts answers to Matthew's portfolio context only. If information is not in retrieved chunks, the assistant should say it does not know rather than invent details.
-
-## Environment variables
-
-### `rag/scripts/.env`
-
-| Variable | Description |
-|----------|-------------|
-| `GEMINI_API_KEY` | Google AI Studio API key |
-| `QDRANT_URL` | Qdrant cluster URL |
-| `QDRANT_API_KEY` | Qdrant API key |
-| `QDRANT_COLLECTION` | Collection name (default: `portfolio_chunks`) |
-
-### Worker secrets
-
-Same `GEMINI_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY` via Wrangler secrets.
-
-## Next steps (not in MVP)
-
-- Log unanswered questions to persistent storage
-- Admin HTTP endpoint to trigger re-indexing
-- Swap in-memory IP rate limiting for Cloudflare KV
+The Worker system prompt tells the assistant to answer only questions about Matthew, his projects, skills, experience, education, and contact information. If the answer is not in retrieved context, it should say it does not know.
 
 ## Troubleshooting
 
 | Issue | Fix |
-|-------|-----|
-| `No indexable chunks found` | Fill in Markdown content; remove TODO-only sections |
-| CORS error in browser | Add your site origin to `ALLOWED_ORIGINS` in `wrangler.toml` |
-| 429 from Gemini | Wait and retry; indexing script backs off automatically |
-| Empty Qdrant results | Re-run `npm run index` after filling content |
-| Widget network error | Confirm `CHAT_API_URL` matches deployed Worker URL |
+| --- | --- |
+| `No indexable chunks found` | Add meaningful Markdown content under `content/` |
+| CORS error in browser | Add the site origin to `ALLOWED_ORIGINS` and redeploy |
+| Empty or weak answers | Re-run `npm run index` and consider lowering `QDRANT_SCORE_THRESHOLD` |
+| 429 from Gemini | Wait and retry; free-tier rate limits are expected |
+| Widget says API is not deployed | Replace the placeholder `CHAT_API_URL` with the deployed Worker URL |

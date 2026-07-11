@@ -1,68 +1,47 @@
-import "dotenv/config";
+import { pipeline, type FeatureExtractionPipeline } from "@xenova/transformers";
 import type { ContentChunk, EmbeddedChunk } from "./types.js";
-import { EMBEDDING_MODEL } from "./types.js";
+import { EMBEDDING_DIMENSION, EMBEDDING_MODEL } from "./types.js";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
 
-if (!GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is required");
+async function getExtractor(): Promise<FeatureExtractionPipeline> {
+  if (!extractorPromise) {
+    console.log(`Loading local embedding model ${EMBEDDING_MODEL} (first run downloads weights)...`);
+    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
+  }
+  return extractorPromise;
 }
 
-const EMBED_URL = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent?key=${GEMINI_API_KEY}`;
+export async function embedText(text: string): Promise<number[]> {
+  const extractor = await getExtractor();
+  const output = await extractor(text, { pooling: "mean", normalize: true });
+  const values = Array.from(output.data as Float32Array);
 
-interface GeminiEmbedResponse {
-  embedding?: { values?: number[] };
-  error?: { code?: number; message?: string; status?: string };
-}
-
-export async function embedText(text: string, retries = 3): Promise<number[]> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const response = await fetch(EMBED_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: `models/${EMBEDDING_MODEL}`,
-        content: { parts: [{ text }] },
-      }),
-    });
-
-    if (response.status === 429 && attempt < retries) {
-      const delayMs = 1000 * 2 ** attempt;
-      console.warn(`Rate limited on embed; retrying in ${delayMs}ms`);
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-      continue;
-    }
-
-    const data = (await response.json()) as GeminiEmbedResponse;
-
-    if (!response.ok) {
-      throw new Error(data.error?.message ?? `Embedding failed (${response.status})`);
-    }
-
-    const values = data.embedding?.values;
-    if (!values?.length) {
-      throw new Error("Embedding response missing vector values");
-    }
-
-    return values;
+  if (values.length !== EMBEDDING_DIMENSION) {
+    throw new Error(
+      `Expected ${EMBEDDING_DIMENSION}-dim embedding, got ${values.length}. Check EMBEDDING_MODEL.`,
+    );
   }
 
-  throw new Error("Embedding failed after retries");
+  return values;
 }
 
 export async function embedChunks(
   chunks: ContentChunk[],
   options: { batchDelayMs?: number } = {},
 ): Promise<EmbeddedChunk[]> {
-  const { batchDelayMs = 250 } = options;
+  const { batchDelayMs = 0 } = options;
   const embedded: EmbeddedChunk[] = [];
+
+  // Warm the model once before the loop
+  await getExtractor();
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
     const vector = await embedText(chunk.textForEmbedding);
     embedded.push({ ...chunk, vector });
 
-    if ((i + 1) % 10 === 0) {
+    if ((i + 1) % 10 === 0 || i === chunks.length - 1) {
       console.log(`Embedded ${i + 1}/${chunks.length}`);
     }
 
