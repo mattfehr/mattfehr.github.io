@@ -25,7 +25,7 @@
             <h3>Matthew's Portfolio Assistant</h3>
             <p>Ask about projects, skills, and experience</p>
           </div>
-          <button id="portfolio-chatbot-reset" type="button">Reset</button>
+          <button id="portfolio-chatbot-reset" type="button" aria-label="Reset conversation" title="Reset conversation">Reset</button>
         </div>
         <div id="portfolio-chatbot-messages" aria-live="polite"></div>
         <div id="portfolio-chatbot-starters"></div>
