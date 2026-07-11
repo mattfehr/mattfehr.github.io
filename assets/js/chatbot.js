@@ -29,7 +29,6 @@
         </div>
         <div id="portfolio-chatbot-messages" aria-live="polite"></div>
         <div id="portfolio-chatbot-starters"></div>
-        <div id="portfolio-chatbot-sources"></div>
         <form id="portfolio-chatbot-form">
           <input id="portfolio-chatbot-input" type="text" maxlength="1000" placeholder="Ask a question..." autocomplete="off" />
           <button id="portfolio-chatbot-submit" type="submit">Send</button>
@@ -72,9 +71,21 @@
   }
 
   function renderSources(sources) {
-    const container = document.getElementById("portfolio-chatbot-sources");
-    container.innerHTML = "";
-    container.classList.toggle("is-visible", sources.length > 0);
+    const existing = document.getElementById("portfolio-chatbot-sources");
+    if (existing) existing.remove();
+    if (!sources.length) return;
+
+    const messages = document.getElementById("portfolio-chatbot-messages");
+    const details = document.createElement("details");
+    details.id = "portfolio-chatbot-sources";
+    details.className = "chatbot-sources";
+
+    const summary = document.createElement("summary");
+    summary.textContent = `Sources (${sources.length})`;
+    details.appendChild(summary);
+
+    const list = document.createElement("div");
+    list.className = "chatbot-source-list";
 
     for (const source of sources) {
       const chip = document.createElement(source.url ? "a" : "span");
@@ -85,8 +96,12 @@
         chip.rel = "noopener noreferrer";
       }
       chip.textContent = `${source.title} - ${source.section}`;
-      container.appendChild(chip);
+      list.appendChild(chip);
     }
+
+    details.appendChild(list);
+    messages.appendChild(details);
+    messages.scrollTop = messages.scrollHeight;
   }
 
   function renderStarters() {
@@ -120,6 +135,7 @@
     const priorHistory = history.slice(-10);
     appendMessage("user", trimmed);
     history.push({ role: "user", content: trimmed });
+    document.getElementById("portfolio-chatbot-starters").innerHTML = "";
     setFormDisabled(true);
     setLoading(true);
     renderSources([]);
